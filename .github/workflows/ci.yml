@@ -57,3 +57,11 @@ jobs:
       # Back-to-back SymbiYosys BMC proof of the cores.
       - name: Run formal test
         run: direnv exec . dfm run wb.proto.fv
+
+      # On a sby failure the proof's logs live in the task rundir (not the dfm
+      # console output); surface them so failures are diagnosable from CI.
+      - name: Dump formal logs on failure
+        if: failure()
+        run: |
+          find rundir/wb.proto.fv -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
+            | while read -r f; do echo "::group::$f"; cat "$f"; echo "::endgroup::"; done
