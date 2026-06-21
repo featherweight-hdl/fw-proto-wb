@@ -1,0 +1,31 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  name: src
+
+  tasks:
+  # The protocol kit itself: the bus-types package + the class-layer package +
+  # the transactor SV interfaces/modules (which cannot live in a package).
+  # incdir '.' picks up the .svh includes (macros, API classes, bridges).
+  #
+  # `needs` the fw modeling library via its EXPORTED task (fw-hdl is imported in
+  # the package flow.yaml relative to $IVPM_PACKAGES) -- not a sibling path -- so
+  # the kit is portable and an app that imports the kit transitively gets fw-hdl.
+  - export: files
+    uses: std.FileSet
+    needs: [fw-hdl.src.sv-src]
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_types_pkg.sv
+      - wb_proto_pkg.sv
+      - wb_initiator_xtor_if.sv
+      - wb_initiator_xtor_core.sv
+      - wb_initiator_xtor.sv
+      - wb_target_xtor_if.sv
+      - wb_target_xtor_core.sv
+      - wb_target_xtor.sv
+      - wb_monitor_xtor_if.sv
+      - wb_monitor_xtor_core.sv
+      - wb_monitor_xtor.sv
+      incdirs:
+      - .

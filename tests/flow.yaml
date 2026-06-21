@@ -1,0 +1,46 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  name: tests
+
+  tasks:
+  # REQUIRED back-to-back simulation test (design §8a): drives the full kit stack
+  # and checks round-trip integrity, backpressure, ERR/RTY, block/RMW, monitor.
+  - name: wb-proto-tb
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_proto_tb.sv
+      incdirs:
+      - .
+
+  - name: wb-proto-img
+    uses: hdlsim.vlt.SimImage
+    needs: [src.files, wb-proto-tb]
+    with:
+      top: [wb_proto_tb]
+
+  - root: wb-proto
+    uses: hdlsim.vlt.SimRun
+    needs: [wb-proto-img]
+
+  # Adapter test (design §7): a full std -> Wishbone -> std stack proving the
+  # protocol-independent std_mem_if layer.
+  - name: wb-std-tb
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_std_tb.sv
+      incdirs:
+      - .
+
+  - name: wb-std-img
+    uses: hdlsim.vlt.SimImage
+    needs: [src.files, wb-std-tb]
+    with:
+      top: [wb_std_tb]
+
+  - root: wb-std
+    uses: hdlsim.vlt.SimRun
+    needs: [wb-std-img]

@@ -1,0 +1,17 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+package:
+  name: wb.proto
+
+  # The fw modeling library this kit builds on, imported relative to
+  # $IVPM_PACKAGES (the same way apps import THIS kit). Makes the kit fully
+  # portable -- no sibling-path assumption. src.files depends on fw-hdl.src.sv-src.
+  imports:
+  - ${{ env.IVPM_PACKAGES }}/fw-hdl
+
+  # The kit sources live in src/; a runnable back-to-back demonstrator (the
+  # REQUIRED §8a sim test) lives in tests/; a back-to-back formal proof of the
+  # cores lives in tests/formal/.
+  fragments:
+  - src/flow.yaml
+  - tests/flow.yaml
+  - tests/formal/flow.yaml

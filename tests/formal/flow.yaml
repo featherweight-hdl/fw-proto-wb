@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
+fragment:
+  name: formal
+
+  tasks:
+  # The kit's synthesizable cores + the shared bus-types package -- the only RTL
+  # the proof needs. The bundled yosys (0.9) cannot read SV structs/packages, so
+  # the cores + the back-to-back harness are flattened to plain Verilog by sv2v
+  # (with -DFORMAL so the property block is included) before SymbiYosys reads them.
+  - name: cores
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      base: ${{ rootdir }}/src
+      include:
+      - wb_types_pkg.sv
+      - wb_initiator_xtor_core.sv
+      - wb_target_xtor_core.sv
+
+  # The back-to-back harness source. Listed as a FileSet so edits to it (and to
+  # the cores) invalidate the sv2v step's cache and force a re-convert.
+  - name: fv-src
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      base: ${{ rootdir }}/tests/formal
+      include:
+      - wb_proto_fv.sv
+
+  # sv2v conversion step: types-pkg + cores + harness -> one yosys-readable .v.
+  # Emits a verilogSource FileSet (via dfm-out) that formal.sby.BMC consumes.
+  # `needs` the source FileSets so a change to any of them re-runs the conversion.
+  - name: sv2v
+    needs: [cores, fv-src]
+    # Always re-convert: a stale conversion silently yields a vacuous/wrong proof
+    # (the body/flags aren't content-hashed). Cheap (~150ms) and safe.
+    uptodate: false
+    shell: bash
+    run: |
+      set -e
+      OUT="$TASK_RUNDIR/wb_proto_fv.v"
+      # --exclude=Assert is REQUIRED: without it sv2v silently STRIPS every
+      # immediate assert/assume/cover, leaving a vacuous (always-passing) proof.
+      sv2v --exclude=Assert -DFORMAL \
+        "${{ rootdir }}/src/wb_types_pkg.sv" \
+        "${{ rootdir }}/src/wb_initiator_xtor_core.sv" \
+        "${{ rootdir }}/src/wb_target_xtor_core.sv" \
+        "${{ rootdir }}/tests/formal/wb_proto_fv.sv" > "$OUT"
+      dfm-out fileset --filetype verilogSource --basedir "$TASK_RUNDIR" wb_proto_fv.v
+
+  # SymbiYosys BMC proof (dv-flow-libformal). depth 24 lets several classic
+  # transfers fully traverse master->bus->slave->bus->master (a transfer crosses
+  # in ~8-10 cycles through the two cores' link handshakes).
+  # formal.sby.BMC is uptodate:false in its base definition (like hdlsim.SimRun),
+  # so the proof always re-runs -- no per-instance setting needed here.
+  - root: fv
+    uses: formal.sby.BMC
+    needs: [sv2v]
+    with:
+      top: wb_proto_fv
+      depth: 24
