@@ -31,6 +31,11 @@ package:
       src: pypi
     - name: sphinx-copybutton
       src: pypi
+    # SymbiYosys (sby, from the yosys package) is a Python program that imports
+    # 'click' at startup; it isn't bundled with the yosys binaries, so the
+    # formal proof (wb.proto.fv) needs it pulled into the env explicitly.
+    - name: click
+      src: pypi
 #      src: ivpm.yaml
 #      url: https://github.com/edapack
 #      dep-sets:
