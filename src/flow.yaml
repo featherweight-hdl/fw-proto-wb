@@ -1,7 +1,8 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
-  name: src
-
+  # No fragment name: its tasks live directly under the package (wb.proto.files),
+  # and an unnamed fragment can't collide with an imported package's fragment
+  # names (fw-hdl also has 'src'/'tests'/'formal' fragments).
   tasks:
   # The protocol kit itself: the bus-types package + the class-layer package +
   # the transactor SV interfaces/modules (which cannot live in a package).
