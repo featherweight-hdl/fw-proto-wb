@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
-  name: tests
-
+  # Unnamed fragment (see src/flow.yaml) -- tasks live under the package, e.g.
+  # wb.proto.wb-proto / wb.proto.wb-std.
   tasks:
   # REQUIRED back-to-back simulation test (design §8a): drives the full kit stack
   # and checks round-trip integrity, backpressure, ERR/RTY, block/RMW, monitor.
@@ -16,7 +16,7 @@ fragment:
 
   - name: wb-proto-img
     uses: hdlsim.vlt.SimImage
-    needs: [src.files, wb-proto-tb]
+    needs: [files, wb-proto-tb]
     with:
       top: [wb_proto_tb]
 
@@ -37,7 +37,7 @@ fragment:
 
   - name: wb-std-img
     uses: hdlsim.vlt.SimImage
-    needs: [src.files, wb-std-tb]
+    needs: [files, wb-std-tb]
     with:
       top: [wb_std_tb]
 

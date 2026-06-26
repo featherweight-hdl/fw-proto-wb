@@ -1,0 +1,42 @@
+
+# yaml-language-server: $schema=https://fvutils.github.io/ivpm/ivpm.schema.json
+package:
+  name: fw-proto-wb
+
+  dep-sets:
+  - name: default-dev
+    deps: 
+    - name: fw-hdl
+      url: https://github.com/featherweight-hdl/fw-hdl.git
+    - name: dv-flow-mgr
+      url: https://github.com/dv-flow/dv-flow-mgr.git
+    - name: dv-flow-libhdlsim
+      url: https://github.com/dv-flow/dv-flow-libhdlsim.git
+    - name: dv-flow-libformal
+      url: https://github.com/dv-flow/dv-flow-libformal.git
+    - name: verilator
+      src: gh-rls
+      url: https://github.com/edapack/verilator-bin
+      cache: true
+    - name: yosys
+      src: gh-rls
+      url: https://github.com/edapack/yosys-bin
+      cache: true
+    # Documentation build (Sphinx) — used by the docs CI workflow. 'sphinx'
+    # itself is pulled in transitively via dv-flow-mgr; these are the extras the
+    # fw-proto-wb docs need.
+    - name: myst-parser
+      src: pypi
+    - name: furo
+      src: pypi
+    - name: sphinx-copybutton
+      src: pypi
+    # SymbiYosys (sby, from the yosys package) is a Python program that imports
+    # 'click' at startup; it isn't bundled with the yosys binaries, so the
+    # formal proof (wb.proto.fv) needs it pulled into the env explicitly.
+    - name: click
+      src: pypi
+#      src: ivpm.yaml
+#      url: https://github.com/edapack
+#      dep-sets:
+#      - verilator

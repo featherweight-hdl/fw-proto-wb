@@ -1,0 +1,67 @@
+name: CI
+
+# Build the kit's dependencies with IVPM and run the simulation + formal tests
+# on every push/PR to the default branch.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Cancel superseded runs on the same ref.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # direnv loads the environment from .envrc, which sources the
+      # packages/packages.envrc that 'ivpm update' generates (sets IVPM_PACKAGES
+      # and puts python/verilator/yosys/sv2v/sby on PATH).
+      - name: Install direnv
+        run: sudo apt-get update && sudo apt-get install -y direnv
+
+      - name: Install IVPM
+        run: python -m pip install ivpm
+
+      # Clones the source deps (fw-hdl, dv-flow-mgr, libhdlsim, libformal) and
+      # fetches the prebuilt verilator/yosys release packages declared in
+      # ivpm.yaml, then writes packages/packages.envrc.
+      - name: Load dependencies (ivpm update -a)
+        run: ivpm update -a
+
+      # Whitelist the .envrc so 'direnv exec' can load it below.
+      - name: Allow direnv
+        run: direnv allow .
+
+      # Back-to-back kit sim (§8a) and the std -> WB -> std adapter stack.
+      - name: Run simulation tests
+        run: |
+          direnv exec . dfm run wb.proto.wb-proto
+          direnv exec . dfm run wb.proto.wb-std
+
+      # Back-to-back SymbiYosys BMC proof of the cores.
+      - name: Run formal test
+        run: direnv exec . dfm run wb.proto.fv
+
+      # On a sby failure the proof's logs live in the task rundir (not the dfm
+      # console output); surface them so failures are diagnosable from CI.
+      - name: Dump formal logs on failure
+        if: failure()
+        run: |
+          find rundir/wb.proto.fv -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
+            | while read -r f; do echo "::group::$f"; cat "$f"; echo "::endgroup::"; done

@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
-  name: formal
-
+  # Unnamed fragment (see src/flow.yaml) -- tasks live under the package, e.g.
+  # wb.proto.fv.
   tasks:
   # The kit's synthesizable cores + the shared bus-types package -- the only RTL
   # the proof needs. The bundled yosys (0.9) cannot read SV structs/packages, so
