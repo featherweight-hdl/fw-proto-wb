@@ -382,9 +382,9 @@ rules (design-rules 1–2) as they play out across the real FIFOs.
    fast. Expected console result: `[wb_proto] PASS`.
 
 **Placement / target.** `tests/wb_proto_tb.sv`, run via
-`dfm run wb.proto.tests.wb-proto` (the demonstrator in §10 IS this required test —
+`dfm run wb.proto.wb-proto` (the demonstrator in §10 IS this required test —
 it is promoted from "example app" to "acceptance test"). Keep it the primary sim
-gate alongside `dfm run wb.proto.formal.fv`.
+gate alongside `dfm run wb.proto.fv`.
 
 > NOTE: the `fw-proto-kit` SKILL currently mandates back-to-back only in *formal*
 > and frames the simulation side as a "demonstrator." This plan elevates
@@ -514,8 +514,8 @@ fw-proto-wb/
       PROPERTIES.md               # the §8 table, per-kit
 ```
 
-Build/run targets follow rv (`dfm run wb.proto.tests.wb-proto`,
-`dfm run wb.proto.formal.fv`); expect `[wb_proto] PASS` and `DONE (PASS)`.
+Build/run targets follow rv (`dfm run wb.proto.wb-proto`,
+`dfm run wb.proto.fv`); expect `[wb_proto] PASS` and `DONE (PASS)`.
 
 ---
 

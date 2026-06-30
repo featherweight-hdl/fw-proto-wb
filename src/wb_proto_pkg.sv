@@ -4,12 +4,12 @@
 // bus types via wb_types_pkg.
 //
 // Macros are included BEFORE the package so they are visible where the bridges
-// use them. fw_pkg supplies fw_component / fw_port / fw_export; wb_types_pkg
+// use them. fw_hdl_pkg supplies fw_component / fw_port / fw_export; wb_types_pkg
 // supplies wb_req_t / wb_rsp_t / wb_xfer_t.
 `include "wb_proto_macros.svh"
 
 package wb_proto_pkg;
-    import fw_pkg::*;
+    import fw_hdl_pkg::*;
     import wb_types_pkg::*;
     // Re-export the bus types so code that imports only wb_proto_pkg sees them.
     export wb_types_pkg::*;

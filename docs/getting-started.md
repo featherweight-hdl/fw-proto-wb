@@ -19,24 +19,24 @@ export PATH=$IVPM_PACKAGES/python/bin:$IVPM_PACKAGES/verilator/bin:$IVPM_PACKAGE
 The kit ships two simulation gates and one formal gate, all driven by `dfm run`:
 
 ```bash
-dfm run wb.proto.tests.wb-proto   # back-to-back sim (the REQUIRED §8a test)  -> [wb_proto] PASS
-dfm run wb.proto.tests.wb-std     # std -> WB -> std adapter stack            -> [wb_std]   PASS
-dfm run wb.proto.formal.fv        # back-to-back formal proof of the cores    -> DONE (PASS)
+dfm run wb.proto.wb-proto   # back-to-back sim (the REQUIRED §8a test)  -> [wb_proto] PASS
+dfm run wb.proto.wb-std     # std -> WB -> std adapter stack            -> [wb_std]   PASS
+dfm run wb.proto.fv        # back-to-back formal proof of the cores    -> DONE (PASS)
 ```
 
-`wb.proto.tests.wb-proto`
+`wb.proto.wb-proto`
 : Wires a full **initiator transactor** directly to a full **target
   transactor** over one shared Wishbone bus (with a **monitor** tapping it) and
   proves data integrity end-to-end through the complete stack — write→read
   round-trip, backpressure on both sides, ERR + RTY terminations, and block/RMW
   chains. This is the primary acceptance test.
 
-`wb.proto.tests.wb-std`
+`wb.proto.wb-std`
 : Drives a full **std → Wishbone → std** stack, where the driver and the memory
   model speak only `std_mem_if` and the adapters bridge to the bus. Demonstrates
   the protocol-independence path.
 
-`wb.proto.formal.fv`
+`wb.proto.fv`
 : A SymbiYosys proof that wires the two synthesizable cores back-to-back and
   verifies the Wishbone normative rules plus end-to-end request/response
   integrity. See {doc}`verification`.

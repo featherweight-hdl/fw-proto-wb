@@ -55,7 +55,7 @@ Wiring `wb_to_std` to `std_to_wb` over a Wishbone bus produces a **std → Wishb
 and never see a Wishbone signal. This is exercised by `tests/wb_std_tb.sv`:
 
 ```bash
-dfm run wb.proto.tests.wb-std     # -> [wb_std] PASS
+dfm run wb.proto.wb-std     # -> [wb_std] PASS
 ```
 
 ```text

@@ -13,7 +13,7 @@ fragment:
   # the kit is portable and an app that imports the kit transitively gets fw-hdl.
   - export: files
     uses: std.FileSet
-    needs: [fw-hdl.src.sv-src]
+    needs: [fw-hdl.hdl.sv-src]
     with:
       type: systemVerilogSource
       include:

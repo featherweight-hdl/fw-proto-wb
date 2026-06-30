@@ -16,7 +16,7 @@
 // Run:  dfm run wb.proto.tests.wb-proto      (expect: [wb_proto] PASS)
 // ======================================================================
 module wb_proto_tb;
-    import fw_pkg::*;
+    import fw_hdl_pkg::*;
     import wb_types_pkg::*;
     import wb_proto_pkg::*;
 

@@ -12,7 +12,7 @@
 // Run:  dfm run wb.proto.tests.wb-std      (expect: [wb_std] PASS)
 // ======================================================================
 module wb_std_tb;
-    import fw_pkg::*;
+    import fw_hdl_pkg::*;
     import wb_types_pkg::*;
     import wb_proto_pkg::*;
 

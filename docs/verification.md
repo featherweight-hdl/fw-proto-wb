@@ -52,7 +52,7 @@ yosys chokes on `logic q[$]`), plus `wb_proto_fv.sv`, with `top: wb_proto_fv`.
 BMC depth is kept modest (~24 cycles) so several classic transfers complete.
 
 ```bash
-dfm run wb.proto.formal.fv        # -> DONE (PASS)
+dfm run wb.proto.fv        # -> DONE (PASS)
 ```
 
 See `tests/formal/PROPERTIES.md` for the per-kit checker table and the teeth
@@ -94,7 +94,7 @@ shared bus (with a `wb_monitor_xtor` tapping it) and asserts:
 6. A **watchdog** `$fatal`s on hang so a broken handshake fails fast.
 
 ```bash
-dfm run wb.proto.tests.wb-proto   # -> [wb_proto] PASS
+dfm run wb.proto.wb-proto   # -> [wb_proto] PASS
 ```
 
 This catches the class of bug formal cannot reach: FIFO depth/ordering errors,

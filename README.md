@@ -4,6 +4,8 @@ A Featherweight-HDL **protocol kit** that bridges a class-level API to the
 signal-level **Wishbone B3** bus. Built on the `fw-proto-kit` pattern (six
 elements per role) and modeled on the proven ready/valid reference kit.
 
+- **Using the library (consumer guide):** [`skills/fw-proto-wb/SKILL.md`](skills/fw-proto-wb/SKILL.md)
+  — how to import the package via `$IVPM_PACKAGES`, instance the transactors, and use the APIs.
 - **Design:** [`docs/wb_proto_kit_design.md`](docs/wb_proto_kit_design.md)
 - **Plan / progress:** [`docs/wb_proto_kit_plan.md`](docs/wb_proto_kit_plan.md)
 - **Formal properties:** [`tests/formal/PROPERTIES.md`](tests/formal/PROPERTIES.md)
@@ -37,9 +39,9 @@ sv2v + yosys + SymbiYosys. Set the IVPM env, then:
 export IVPM_PACKAGES=<…>/fw-wb-dma/packages
 export PATH=$IVPM_PACKAGES/python/bin:$IVPM_PACKAGES/verilator/bin:$IVPM_PACKAGES/yosys/bin:$PATH
 
-dfm run wb.proto.tests.wb-proto   # back-to-back sim (REQUIRED §8a)  -> [wb_proto] PASS
-dfm run wb.proto.tests.wb-std     # std -> WB -> std adapter stack   -> [wb_std]   PASS
-dfm run wb.proto.formal.fv        # back-to-back formal proof        -> DONE (PASS)
+dfm run wb.proto.wb-proto   # back-to-back sim (REQUIRED §8a)  -> [wb_proto] PASS
+dfm run wb.proto.wb-std     # std -> WB -> std adapter stack   -> [wb_std]   PASS
+dfm run wb.proto.fv        # back-to-back formal proof        -> DONE (PASS)
 ```
 
 ### Formal toolchain note

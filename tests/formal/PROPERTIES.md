@@ -3,7 +3,7 @@
 The worked "spec → invariants → checkers" mapping for this kit (see the
 `fw-proto-kit` SKILL *"From spec to checkers"*). Every row is implemented in
 `wb_proto_fv.sv` inside the `` `ifdef FORMAL `` block and proven by
-`dfm run wb.proto.formal.fv` (BMC, boolector, depth 24).
+`dfm run wb.proto.fv` (BMC, boolector, depth 24).
 
 Wishbone classic, in one breath:
 > A phase transfers on a cycle where `STB && (ACK|ERR|RTY)` within an asserted

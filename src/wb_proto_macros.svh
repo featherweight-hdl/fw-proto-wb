@@ -23,8 +23,9 @@
             implements wb_initiator_if #(REQ, RSP); \
         local IMP m_imp; \
         function new(IMP imp); \
-            super.new(`"NAME`", imp, this); \
-            m_imp = imp; \
+            super.new(`"NAME`", imp, null); \
+            set_imp(this);  /* upcast `this` AFTER super.new: passing it INTO */ \
+            m_imp = imp;    /* super.new segfaults Verilator 5.041 (this-in-ctor) */ \
         endfunction \
         virtual task xfer(output RSP rsp, input REQ req); \
             m_imp.NAME``_xfer(rsp, req); \
@@ -37,8 +38,9 @@
             implements wb_target_if #(REQ, RSP); \
         local IMP m_imp; \
         function new(IMP imp); \
-            super.new(`"NAME`", imp, this); \
-            m_imp = imp; \
+            super.new(`"NAME`", imp, null); \
+            set_imp(this);  /* upcast `this` AFTER super.new: passing it INTO */ \
+            m_imp = imp;    /* super.new segfaults Verilator 5.041 (this-in-ctor) */ \
         endfunction \
         virtual task access(output RSP rsp, input REQ req); \
             m_imp.NAME``_access(rsp, req); \
@@ -51,8 +53,9 @@
             implements wb_monitor_if #(XFER); \
         local IMP m_imp; \
         function new(IMP imp); \
-            super.new(`"NAME`", imp, this); \
-            m_imp = imp; \
+            super.new(`"NAME`", imp, null); \
+            set_imp(this);  /* upcast `this` AFTER super.new: passing it INTO */ \
+            m_imp = imp;    /* super.new segfaults Verilator 5.041 (this-in-ctor) */ \
         endfunction \
         virtual function void observe(input XFER xfer); \
             m_imp.NAME``_observe(xfer); \
@@ -68,8 +71,9 @@
             implements std_mem_if #(ADDR, DATA, STRB); \
         local IMP m_imp; \
         function new(IMP imp); \
-            super.new(`"NAME`", imp, this); \
-            m_imp = imp; \
+            super.new(`"NAME`", imp, null); \
+            set_imp(this);  /* upcast `this` AFTER super.new: passing it INTO */ \
+            m_imp = imp;    /* super.new segfaults Verilator 5.041 (this-in-ctor) */ \
         endfunction \
         virtual task write(output bit err, input ADDR addr, input DATA data, \
                            input STRB strb); \

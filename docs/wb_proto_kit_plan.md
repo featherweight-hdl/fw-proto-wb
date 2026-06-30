@@ -13,8 +13,8 @@ xtor_if → core → xtor → TB → formal → adapters → docs).
 direct rv analog; build by analogy, then add the request/response second link.
 
 **Definition of done (whole kit):**
-- `dfm run wb.proto.tests.wb-proto` → `[wb_proto] PASS` (back-to-back sim, §8a).
-- `dfm run wb.proto.formal.fv` → `DONE (PASS)`, and **fails** when a bug is
+- `dfm run wb.proto.wb-proto` → `[wb_proto] PASS` (back-to-back sim, §8a).
+- `dfm run wb.proto.fv` → `DONE (PASS)`, and **fails** when a bug is
   injected (proof has teeth).
 - All design open issues O-1…O-9 either resolved or explicitly deferred in docs.
 
@@ -34,7 +34,7 @@ direct rv analog; build by analogy, then add the request/response second link.
   Next: Phase 6 back-to-back sim test.
 
 - **2026-06-21** — Phase 6 complete: `tests/wb_proto_tb.sv` + memory-model slave
-  wired init↔target↔monitor on one WB bus. `dfm run wb.proto.tests.wb-proto` →
+  wired init↔target↔monitor on one WB bus. `dfm run wb.proto.wb-proto` →
   **`[wb_proto] PASS`**. All §8a criteria green: round-trip integrity, slave/master
   backpressure, ERR + RTY (retry to completion), block + RMW (`cyc_hold` chains,
   RMW read-back = incremented value), monitor observed all 23 phases, CYC-mid-phase
@@ -42,7 +42,7 @@ direct rv analog; build by analogy, then add the request/response second link.
   adapters, then docs.
 
 - **2026-06-21** — Phase 8 complete: back-to-back formal proof (`tests/formal/
-  wb_proto_fv.sv`) of the two cores. `dfm run wb.proto.formal.fv` →
+  wb_proto_fv.sv`) of the two cores. `dfm run wb.proto.fv` →
   **`DONE (PASS)`** (BMC depth 24, ~20s), covers reachable (non-vacuous), and
   bug-injection confirmed teeth (`DONE (FAIL)`). Two toolchain findings: (a) yosys
   0.9 can't read SV structs/packages → flow runs `sv2v --exclude=Assert -DFORMAL`
@@ -57,7 +57,7 @@ direct rv analog; build by analogy, then add the request/response second link.
   `wb_to_std` (initiator-side, RTY-retry/ERR-escalation) and `std_to_wb`
   (target-side). New test `tests/wb_std_tb.sv` drives a full **std → Wishbone →
   std** stack (driver + memory model speak only std_mem_if). `dfm run
-  wb.proto.tests.wb-std` → **`[wb_std] PASS`**. 7.3 `wb_block_adapter` DEFERRED to
+  wb.proto.wb-std` → **`[wb_std] PASS`**. 7.3 `wb_block_adapter` DEFERRED to
   Phase 10 — `cyc_hold` block/RMW is already exercised in the §8a sim and proven
   by formal row 8, so a standalone burst adapter is low-value for MVP. Next:
   Phase 9 docs.
@@ -85,7 +85,7 @@ green compile to protect.
   `tests/flow.yaml`, `tests/formal/flow.yaml`. Work: copy rv's four flow files,
   rename `rv.proto`→`wb.proto`, fix the `fw-src` relative `base` path to reach
   `fw-hdl/src` from this package, list the `wb_*` files (created later). Deps: —.
-  Accept: `dfm run wb.proto.tests.wb-proto` *fails only* on missing SV, not on
+  Accept: `dfm run wb.proto.wb-proto` *fails only* on missing SV, not on
   flow/yaml errors.
 - [x] **0.2 Empty package compiles.** Deliverable: `src/wb_proto_pkg.sv` importing
   `fw_pkg`, including macros + types + APIs + bridges (stubs ok). Work: mirror
@@ -216,7 +216,7 @@ Goal: the hard acceptance gate — full stack, round-trip integrity.
     sequence.
   - [x] **6.2f Watchdog** — `$fatal` on hang; clean exit prints `[wb_proto] PASS`.
 - [x] **6.3 Wire into flow.** `tests/flow.yaml` SimImage+SimRun (`top:
-  wb_proto_tb`). Deps: 6.2. Accept: `dfm run wb.proto.tests.wb-proto` →
+  wb_proto_tb`). Deps: 6.2. Accept: `dfm run wb.proto.wb-proto` →
   `[wb_proto] PASS`.
 
 **Milestone M2 — back-to-back sim green.** ✅ [wb_proto] PASS The §8a requirement met.
@@ -253,7 +253,7 @@ Can proceed in parallel with Phase 8.
   CYC-span. Deps: 8.1. Accept: each has a matching `cover`.
 - [x] **8.3 `tests/formal/flow.yaml`.** Cores-only FileSet + `formal.sby.BMC`
   (`top: wb_proto_fv`, depth ~16–20). Deps: 8.1. Accept: `dfm run
-  wb.proto.formal.fv` → `DONE (PASS)`.
+  wb.proto.fv` → `DONE (PASS)`.
 - [x] **8.4 Bug-injection sanity (mandatory).** Corrupt one captured bit; confirm
   sby reports `Assert failed` / `DONE (FAIL)`; revert. Deps: 8.3. Accept:
   documented failing run → proof has teeth.
