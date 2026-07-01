@@ -1,41 +1,78 @@
-// Target transactor module: instances the core + transactor-interface and wires
-// them with the two plain ready/valid link buses, exposing clock/reset + the
-// Wishbone SLAVE pins. Reach `u_if` from a testbench to bind the target bridge's
-// virtual interface.
-module wb_target_xtor
-    import wb_types_pkg::*;
-(
-    input                  clock,
-    input                  reset,
-    input  [WB_AW-1:0]     adr_i,
-    input  [WB_DW-1:0]     dat_i,
-    input  [WB_SW-1:0]     sel_i,
-    input                  we_i,
-    input                  cyc_i,
-    input                  stb_i,
-    output bit [WB_DW-1:0] dat_o,
-    output bit             ack_o,
-    output bit             err_o,
-    output bit             rty_o
-);
-    wb_req_t req_data;
-    bit      req_valid;
-    bit      req_ready;
-    wb_rsp_t rsp_data;
-    bit      rsp_valid;
-    bit      rsp_ready;
+// ----------------------------------------------------------------------------
+// Wishbone Target transactor (integration)
+//
+// Integrates the SV interface (FIFOs + task API) with the core transactor.
+// The HVL side reaches the task API via the inner interface instance: u_if.
+// Public Wishbone pins use bare names (adr/dat_w/dat_r/...) -- kit convention D6.
+// ----------------------------------------------------------------------------
+module wb_target_xtor #(
+        parameter int ADDR_WIDTH = 32,
+        parameter int DATA_WIDTH = 32,
+        parameter int REQ_WIDTH  = (ADDR_WIDTH + DATA_WIDTH + (DATA_WIDTH/8) + 1),
+        parameter int RSP_WIDTH  = (DATA_WIDTH + 1)
+    ) (
+        input  wire                     clock,
+        input  wire                     reset,
 
-    wb_target_xtor_if u_if (
-        .clock(clock), .reset(reset),
-        .req_data(req_data), .req_valid(req_valid), .req_ready(req_ready),
-        .rsp_data(rsp_data), .rsp_valid(rsp_valid), .rsp_ready(rsp_ready)
+        // Wishbone target (protocol) signals
+        input  wire [ADDR_WIDTH-1:0]    adr,
+        input  wire [DATA_WIDTH-1:0]    dat_w,
+        output wire [DATA_WIDTH-1:0]    dat_r,
+        input  wire                     cyc,
+        output wire                     err,
+        input  wire [DATA_WIDTH/8-1:0]  sel,
+        input  wire                     stb,
+        output wire                     ack,
+        input  wire                     we
     );
-    wb_target_xtor_core u_core (
-        .clock(clock), .reset(reset),
-        .req_data(req_data), .req_valid(req_valid), .req_ready(req_ready),
-        .rsp_data(rsp_data), .rsp_valid(rsp_valid), .rsp_ready(rsp_ready),
-        .adr_i(adr_i), .dat_i(dat_i), .sel_i(sel_i), .we_i(we_i),
-        .cyc_i(cyc_i), .stb_i(stb_i),
-        .dat_o(dat_o), .ack_o(ack_o), .err_o(err_o), .rty_o(rty_o)
+
+    // RV channels between interface and core
+    wire [REQ_WIDTH-1:0]  req_dat;
+    wire                  req_valid;
+    wire                  req_ready;
+    wire [RSP_WIDTH-1:0]  rsp_dat;
+    wire                  rsp_valid;
+    wire                  rsp_ready;
+
+    // Only ADDR_WIDTH/DATA_WIDTH are overridden so the interface specialization
+    // matches a `virtual wb_target_xtor_if #(ADDR_WIDTH, DATA_WIDTH)` handle.
+    wb_target_xtor_if #(
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .DATA_WIDTH(DATA_WIDTH)
+    ) u_if (
+        .clock(clock),
+        .reset(reset),
+        .req_dat(req_dat),
+        .req_valid(req_valid),
+        .req_ready(req_ready),
+        .rsp_dat(rsp_dat),
+        .rsp_valid(rsp_valid),
+        .rsp_ready(rsp_ready)
     );
+
+    wb_target_xtor_core #(
+        .ADDR_WIDTH(ADDR_WIDTH),
+        .DATA_WIDTH(DATA_WIDTH),
+        .REQ_WIDTH(REQ_WIDTH),
+        .RSP_WIDTH(RSP_WIDTH)
+    ) u_core (
+        .clock(clock),
+        .reset(reset),
+        .adr(adr),
+        .dat_w(dat_w),
+        .dat_r(dat_r),
+        .cyc(cyc),
+        .err(err),
+        .sel(sel),
+        .stb(stb),
+        .ack(ack),
+        .we(we),
+        .req_dat(req_dat),
+        .req_valid(req_valid),
+        .req_ready(req_ready),
+        .rsp_dat(rsp_dat),
+        .rsp_valid(rsp_valid),
+        .rsp_ready(rsp_ready)
+    );
+
 endmodule

@@ -1,24 +1,24 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
-  # No fragment name: its tasks live directly under the package (wb.proto.files),
+  # No fragment name: its tasks live directly under the package (fw.proto.wb.files),
   # and an unnamed fragment can't collide with an imported package's fragment
   # names (fw-hdl also has 'src'/'tests'/'formal' fragments).
   tasks:
-  # The protocol kit itself: the bus-types package + the class-layer package +
-  # the transactor SV interfaces/modules (which cannot live in a package).
-  # incdir '.' picks up the .svh includes (macros, API classes, bridges).
+  # The protocol kit itself: the class-layer package + the transactor SV
+  # interfaces/modules (which cannot live in a package). incdir '.' picks up the
+  # .svh includes (API classes, bridges, adapters).
   #
-  # `needs` the fw modeling library via its EXPORTED task (fw-hdl is imported in
-  # the package flow.yaml relative to $IVPM_PACKAGES) -- not a sibling path -- so
-  # the kit is portable and an app that imports the kit transitively gets fw-hdl.
+  # NOTE: the class layer no longer uses fw-hdl (the bridges hold/implement the API
+  # directly instead of fw_component/fw_port/fw_export), so the old
+  # `needs: [fw-hdl.hdl.sv-src]` was dropped. fw-hdl can be removed from the
+  # package flow.yaml import + ivpm.yaml entirely.
   - export: files
     uses: std.FileSet
-    needs: [fw-hdl.src.sv-src]
     with:
       type: systemVerilogSource
       include:
-      - wb_types_pkg.sv
-      - wb_proto_pkg.sv
+      - fw_proto_wb_pkg.sv
+      - wb_proto_checker.sv
       - wb_initiator_xtor_if.sv
       - wb_initiator_xtor_core.sv
       - wb_initiator_xtor.sv
@@ -27,6 +27,72 @@ fragment:
       - wb_target_xtor.sv
       - wb_monitor_xtor_if.sv
       - wb_monitor_xtor_core.sv
+      - wb_monitor_xtor.sv
+      incdirs:
+      - .
+
+  # ----------------------------------------------------------------------
+  # Class layer ONLY (the fw_proto_wb_pkg: wb_proto_if + the *_xtor_bridge
+  # classes). Methodology consumers that want the bridges (e.g. the fwvip-wb
+  # UVM VIP, which makes its target config the wb_proto_if handler and lets
+  # wb_target_xtor_bridge poll the FIFOs / call access()) pull this on top of
+  # the transactor SV interfaces. needs xtor-sv: the bridges reference the
+  # transactor interfaces by name, so those must be compiled in the same image
+  # first.
+  # ----------------------------------------------------------------------
+  - export: class
+    uses: std.FileSet
+    needs: [xtor-sv]
+    with:
+      type: systemVerilogSource
+      include:
+      - fw_proto_wb_pkg.sv
+      incdirs:
+      - .
+
+  # ----------------------------------------------------------------------
+  # Protocol checker, exported on its own. wb_proto_checker is a self-contained
+  # passive module (bare WB ports, no package/class-layer/fw-hdl dependency), so
+  # methodology-independent consumers (the fwvip-wb VIP's formal TBs, a sim bind,
+  # real RTL) can pull in JUST the protocol invariants without the full kit.
+  # ----------------------------------------------------------------------
+  - export: checker
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_proto_checker.sv
+      incdirs:
+      - .
+
+  # ----------------------------------------------------------------------
+  # Transactor-only exports (no class layer, no fw-hdl) for methodology-
+  # independent consumers (e.g. the fwvip-wb UVM VIP, pure-Verilog, formal).
+  # Mirrors the split the transactor had inside fwvip-wb before the move.
+  # wb_xtor_macros.svh is picked up via incdir '.'.
+  # ----------------------------------------------------------------------
+  - export: xtor-core
+    uses: std.FileSet
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_initiator_xtor_core.sv
+      - wb_target_xtor_core.sv
+      - wb_monitor_xtor_core.sv
+      incdirs:
+      - .
+
+  - export: xtor-sv
+    uses: std.FileSet
+    needs: [xtor-core]
+    with:
+      type: systemVerilogSource
+      include:
+      - wb_initiator_xtor_if.sv
+      - wb_target_xtor_if.sv
+      - wb_monitor_xtor_if.sv
+      - wb_initiator_xtor.sv
+      - wb_target_xtor.sv
       - wb_monitor_xtor.sv
       incdirs:
       - .

@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 package:
-  name: wb.proto
+  name: fw.proto.wb
 
   # The fw modeling library this kit builds on, imported relative to
   # $IVPM_PACKAGES (the same way apps import THIS kit). Makes the kit fully
