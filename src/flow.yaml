@@ -8,11 +8,13 @@ fragment:
   # interfaces/modules (which cannot live in a package). incdir '.' picks up the
   # .svh includes (API classes, bridges, adapters).
   #
-  # NOTE: the class layer no longer uses fw-hdl (the bridges hold/implement the API
-  # directly instead of fw_component/fw_port/fw_export), so the old
-  # `needs: [fw-hdl.hdl.sv-src]` was dropped. fw-hdl can be removed from the
-  # package flow.yaml import + ivpm.yaml entirely.
+  # NOTE: the bridge classes are fw-hdl-free, but fw_proto_wb_pkg now also carries
+  # the fw_mem_if <-> wb_proto_if adapters (wb_mem_adapters.svh), which use
+  # fw_component/fw_export and fw_mem_if from fw-hdl's fw_std_pkg. So this FileSet
+  # `needs` fw-hdl.hdl.sv-src (carrying fw_hdl_pkg + fw_std_pkg + the std incdir
+  # where fw_std_macros.svh lives).
   - export: files
+    needs: [fw-hdl.hdl.sv-src]
     uses: std.FileSet
     with:
       type: systemVerilogSource
@@ -42,7 +44,7 @@ fragment:
   # ----------------------------------------------------------------------
   - export: class
     uses: std.FileSet
-    needs: [xtor-sv]
+    needs: [xtor-sv, fw-hdl.hdl.sv-src]
     with:
       type: systemVerilogSource
       include:
