@@ -1,90 +1,203 @@
-// Target core: a clocked Wishbone SLAVE FSM. It is the slave on the bus pins, a
-// PRODUCER on the request link (captured requests up to the iface) and a CONSUMER
-// on the response link (responses down from the iface). On a new phase
-// (CYC_I && STB_I) it captures the request and presents it up; it asserts NO
-// termination until the response arrives (RULE 3.35/3.50 -- ACK only in response
-// to STB); then it drives DAT_O + exactly one of ACK/ERR/RTY (RULE 3.45) until the
-// master ends the phase (STB_I negates). Always registered => at least one wait
-// state (design O-5: a true async/zero-wait slave is intentionally out of scope).
-module wb_target_xtor_core
-    import wb_types_pkg::*;
-(
-    input            clock,
-    input            reset,
-    // request link (to xtor_if): ready/valid PRODUCER
-    output wb_req_t  req_data,
-    output bit       req_valid,
-    input            req_ready,
-    // response link (from xtor_if): ready/valid CONSUMER
-    input  wb_rsp_t  rsp_data,
-    input            rsp_valid,
-    output bit       rsp_ready,
-    // Wishbone SLAVE pins
-    input  [WB_AW-1:0] adr_i,
-    input  [WB_DW-1:0] dat_i,
-    input  [WB_SW-1:0] sel_i,
-    input              we_i,
-    input              cyc_i,
-    input              stb_i,
-    output bit [WB_DW-1:0] dat_o,
-    output bit             ack_o,
-    output bit             err_o,
-    output bit             rty_o
-);
-    typedef enum bit [1:0] {WB_WATCH, WB_REQ, WB_WAIT, WB_ACK} state_t;
-    state_t st;
+`include "wb_xtor_macros.svh"
 
-    always @(posedge clock) begin
-        if (reset) begin
-            st        <= WB_WATCH;
-            req_valid <= 1'b0;
-            req_data  <= '0;
-            rsp_ready <= 1'b0;
-            dat_o     <= '0;
-            ack_o     <= 1'b0;
-            err_o     <= 1'b0;
-            rty_o     <= 1'b0;
-        end else case (st)
-            WB_WATCH:
-                if (cyc_i && stb_i) begin           // new bus phase qualified
-                    req_data.adr      <= adr_i;
-                    req_data.dat      <= dat_i;
-                    req_data.sel      <= sel_i;
-                    req_data.we       <= we_i;
-                    req_data.cyc_hold <= 1'b0;       // not observable at the slave
-                    req_valid         <= 1'b1;
-                    st                <= WB_REQ;
+// ----------------------------------------------------------------------------
+// Wishbone Target (slave) core transactor (pure module, signal-level ports)
+//
+//   - Observes the classic Wishbone target signals
+//   - Converts each single-cycle access to an RV request (req_)
+//   - Waits for the RV response (rsp_), then drives ACK/ERR back on the bus
+//   - Single outstanding transaction (no pipelining)
+//
+//   req_* : RV initiator port (core -> FIFO)  { adr, dat, we, sel(byte-en) }
+//   rsp_* : RV target port    (FIFO -> core)  { dat, err }
+//
+// Migrated from fwvip-wb (authoritative transactor API). ack/err only.
+// ----------------------------------------------------------------------------
+module wb_target_xtor_core #(
+        parameter int ADDR_WIDTH = 32,
+        parameter int DATA_WIDTH = 32,
+        parameter int REQ_WIDTH  = (ADDR_WIDTH + DATA_WIDTH + (DATA_WIDTH/8) + 1),
+        parameter int RSP_WIDTH  = (DATA_WIDTH + 1)
+    ) (
+        input  wire                     clock,
+        input  wire                     reset,
+
+        // Wishbone target (protocol) signals
+        input  wire [ADDR_WIDTH-1:0]    adr,
+        input  wire [DATA_WIDTH-1:0]    dat_w,
+        output wire [DATA_WIDTH-1:0]    dat_r,
+        input  wire                     cyc,
+        output wire                     err,
+        input  wire [DATA_WIDTH/8-1:0]  sel,
+        input  wire                     stb,
+        output wire                     ack,
+        input  wire                     we,
+
+        // RV request channel (core drives, FIFO accepts)
+        output wire [REQ_WIDTH-1:0]     req_dat,
+        output wire                     req_valid,
+        input  wire                     req_ready,
+
+        // RV response channel (FIFO drives, core accepts)
+        input  wire [RSP_WIDTH-1:0]     rsp_dat,
+        input  wire                     rsp_valid,
+        output wire                     rsp_ready
+    );
+
+    typedef `WB_TARGET_REQ_S(ADDR_WIDTH, DATA_WIDTH) req_s;
+    typedef `WB_TARGET_RSP_S(ADDR_WIDTH, DATA_WIDTH) rsp_s;
+
+    // Latched Wishbone request fields
+    reg [ADDR_WIDTH-1:0]     adr_q;
+    reg [DATA_WIDTH-1:0]     dat_w_q;
+    reg [(DATA_WIDTH/8)-1:0] sel_q;
+    reg                      we_q;
+
+    // Response latches
+    reg [DATA_WIDTH-1:0]     dat_r_q;
+    reg                      err_q;
+
+    // Wishbone termination outputs (registered)
+    reg                      ack_r;
+    reg                      err_r;
+
+    // RV request handshake
+    reg                      req_valid_r;
+    wire                     req_fire = req_valid && req_ready;
+
+    // Pack request vector from latched fields
+    req_s req_u;
+    always_comb begin
+        req_u.adr = adr_q;
+        req_u.dat = dat_w_q;
+        req_u.we  = we_q;
+        req_u.sel = sel_q;
+    end
+    assign req_dat   = req_u;
+    assign req_valid = req_valid_r;
+
+    // Unpack response vector
+    rsp_s rsp_u;
+    always_comb begin
+        rsp_u = rsp_s'(rsp_dat);
+    end
+
+    assign dat_r = dat_r_q;
+    assign ack   = ack_r;
+    assign err   = err_r;
+
+    // Wishbone cycle is active when CYC & STB asserted
+    wire active_cycle = cyc & stb;
+
+    // FSM
+    typedef enum logic [1:0] {
+        IDLE     = 2'b00,
+        REQ      = 2'b01,
+        WAIT_RSP = 2'b10,
+        RESP     = 2'b11
+    } state_e;
+
+    state_e state, state_n;
+
+    // Accept a response beat only while actually awaiting one (WAIT_RSP): a proper
+    // ready/valid handshake, so a beat that asserts ready+valid is genuinely
+    // consumed (never dropped). In normal FIFO-fed use rsp_valid only asserts in
+    // WAIT_RSP, so this is behaviour-neutral there; it also makes the back-to-back
+    // formal proof's response accounting exact.
+    assign rsp_ready = (state == WAIT_RSP);
+
+    wire rsp_fire = (state == WAIT_RSP) && rsp_valid && rsp_ready;
+
+    // Next-state
+    always_comb begin
+        state_n = state;
+        case (state)
+            IDLE: begin
+                if (active_cycle) begin
+                    state_n = REQ;
                 end
-
-            WB_REQ:
-                if (req_valid && req_ready) begin    // request-link transfer
-                    req_valid <= 1'b0;
-                    rsp_ready <= 1'b1;               // ready to take the response
-                    st        <= WB_WAIT;
+            end
+            REQ: begin
+                if (!active_cycle) begin
+                    state_n = IDLE;       // master aborted early
+                end else if (req_fire) begin
+                    state_n = WAIT_RSP;
                 end
-
-            WB_WAIT:
-                if (rsp_valid && rsp_ready) begin    // response-link transfer
-                    // Drive exactly one termination (RULE 3.45) defensively, with
-                    // priority err > rty > ack, so the bus contract holds even if a
-                    // model hands back a malformed response with err && rty set.
-                    dat_o     <= rsp_data.dat;
-                    err_o     <= rsp_data.err;
-                    rty_o     <= rsp_data.rty && !rsp_data.err;
-                    ack_o     <= !(rsp_data.err || rsp_data.rty);
-                    rsp_ready <= 1'b0;
-                    st        <= WB_ACK;
+            end
+            WAIT_RSP: begin
+                if (!active_cycle) begin
+                    state_n = IDLE;       // master aborted cycle
+                end else if (rsp_fire) begin
+                    state_n = RESP;
                 end
-
-            WB_ACK:
-                if (!stb_i) begin                    // master ended the phase
-                    ack_o <= 1'b0;
-                    err_o <= 1'b0;
-                    rty_o <= 1'b0;
-                    st    <= WB_WATCH;
+            end
+            RESP: begin
+                // Hold the response until the master ENDS the phase (negates STB).
+                // Returning to IDLE while CYC/STB are still asserted would let the
+                // slave re-capture the very same phase as a spurious second request
+                // (the master needs a cycle to react to ACK). Waiting for
+                // !active_cycle is the proper WB slave handshake (cf. the prior
+                // core's WB_ACK state).
+                if (!active_cycle) begin
+                    state_n = IDLE;
                 end
-
-            default: st <= WB_WATCH;
+            end
+            default: state_n = IDLE;
         endcase
     end
+
+    // Sequential logic
+    always @(posedge clock or posedge reset) begin
+        if (reset) begin
+            state       <= IDLE;
+            adr_q       <= '0;
+            dat_w_q     <= '0;
+            sel_q       <= '0;
+            we_q        <= 1'b0;
+            dat_r_q     <= '0;
+            err_q       <= 1'b0;
+            req_valid_r <= 1'b0;
+            ack_r       <= 1'b0;
+            err_r       <= 1'b0;
+        end else begin
+            state <= state_n;
+
+            // One-cycle ACK/ERR pulse while in RESP
+            ack_r <= 1'b0;
+            err_r <= 1'b0;
+            if (state == RESP) begin
+                ack_r <= ~err_q;
+                err_r <= err_q;
+            end
+
+            case (state)
+                IDLE: begin
+                    req_valid_r <= 1'b0;
+                    if (active_cycle) begin
+                        // Latch incoming bus request
+                        adr_q       <= adr;
+                        dat_w_q     <= dat_w;
+                        sel_q       <= sel;
+                        we_q        <= we;
+                        req_valid_r <= 1'b1;
+                    end
+                end
+                REQ: begin
+                    if (!active_cycle) begin
+                        req_valid_r <= 1'b0;
+                    end else if (req_fire) begin
+                        req_valid_r <= 1'b0;
+                    end
+                end
+                WAIT_RSP: begin
+                    if (active_cycle && rsp_fire) begin
+                        dat_r_q <= rsp_u.dat;
+                        err_q   <= rsp_u.err;
+                    end
+                end
+                default: ;
+            endcase
+        end
+    end
+
 endmodule

@@ -17,17 +17,28 @@ transactor-interface + clocked core + wrapper module):
 
 | Role | API | Drives | Provided by |
 | --- | --- | --- | --- |
-| **initiator** (master) | `wb_initiator_if` — `xfer(rsp, req)` | CYC/STB/ADR/DAT_O/WE/SEL | `wb_initiator_bridge` |
-| **target** (slave) | `wb_target_if` — `access(rsp, req)` | ACK/ERR/RTY/DAT_O | `wb_target_bridge` (port) |
+| **initiator** (master) | `wb_initiator_if` — `xfer(rsp, req)` | CYC/STB/ADR/DAT_W/WE/SEL | `wb_initiator_bridge` |
+| **target** (slave) | `wb_target_if` — `access(rsp, req)` | ACK/ERR/DAT_R | `wb_target_bridge` (port) |
 | **monitor** | `wb_monitor_if` — `observe(xfer)` | — (taps only) | `wb_monitor_bridge` (port) |
 
-Bus payloads are packed structs in `wb_types_pkg` (`wb_req_t`, `wb_rsp_t`,
-`wb_xfer_t`). ACK is implicit (a completed `xfer` with `!err && !rty`); `cyc_hold`
-chains block/RMW cycles. **Parameter order is outputs-first** (`xfer(rsp, req)`).
+> **Migration note.** The signal-level transactor (interface / core / wrapper) is
+> the authoritative implementation from the `fwvip-wb` VIP, moved here as the
+> canonical core. Its transactor-level task API is **individual-argument**
+> (`request(adr,dat,sel,we)` / `response(dat,err)`, `wait_req`/`send_rsp`,
+> `wait_txn`) and **per-instance width-parameterized** (`#(ADDR_WIDTH, DATA_WIDTH)`).
+> The class layer above it (interface classes, bridges, `std` adapters) is likewise
+> width-parameterized (by `type REQ/RSP/XFER` + `int ADDR_WIDTH/DATA_WIDTH`). The
+> transactor is **classic single-outstanding WB: ACK/ERR only** — `RTY` and
+> `cyc_hold` (block/RMW) are not currently implemented. Public WB pins use **bare
+> names** (`adr`/`dat_w`/`dat_r`/...).
+
+Bus payloads are packed structs in `wb_types_pkg` (`wb_req_t {adr,dat,sel,we}`,
+`wb_rsp_t {dat,err}`, `wb_xfer_t {req,rsp}`). ACK is implicit (a completed `xfer`
+with `!err`). **Parameter order is outputs-first** (`xfer(rsp, req)`).
 
 **Class-layer adapters** (the protocol-independence win):
 - `wb_to_std` — provides the protocol-independent `std_mem_if`
-  (`read`/`write`) over a Wishbone initiator; retries RTY, escalates ERR.
+  (`read`/`write`) over a Wishbone initiator; escalates ERR.
 - `std_to_wb` — backs a Wishbone slave with any `std_mem_if` memory model.
 
 ## Build & run

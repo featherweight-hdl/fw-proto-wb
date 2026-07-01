@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
   # Unnamed fragment (see src/flow.yaml) -- tasks live under the package, e.g.
-  # wb.proto.fv.
+  # fw.proto.wb.fv.
   tasks:
   # The kit's synthesizable cores + the shared bus-types package -- the only RTL
   # the proof needs. The bundled yosys (0.9) cannot read SV structs/packages, so
@@ -12,10 +12,12 @@ fragment:
     with:
       type: systemVerilogSource
       base: ${{ rootdir }}/src
+      incdirs:
+      - .
       include:
-      - wb_types_pkg.sv
       - wb_initiator_xtor_core.sv
       - wb_target_xtor_core.sv
+      - wb_proto_checker.sv
 
   # The back-to-back harness source. Listed as a FileSet so edits to it (and to
   # the cores) invalidate the sv2v step's cache and force a re-convert.
@@ -41,10 +43,13 @@ fragment:
       OUT="$TASK_RUNDIR/wb_proto_fv.v"
       # --exclude=Assert is REQUIRED: without it sv2v silently STRIPS every
       # immediate assert/assume/cover, leaving a vacuous (always-passing) proof.
+      # -I src: the cores `include "wb_xtor_macros.svh". wb_types_pkg is no longer
+      # needed (the harness uses the cores' raw packed link vectors -- D2/D3).
       sv2v --exclude=Assert -DFORMAL \
-        "${{ rootdir }}/src/wb_types_pkg.sv" \
+        -I "${{ rootdir }}/src" \
         "${{ rootdir }}/src/wb_initiator_xtor_core.sv" \
         "${{ rootdir }}/src/wb_target_xtor_core.sv" \
+        "${{ rootdir }}/src/wb_proto_checker.sv" \
         "${{ rootdir }}/tests/formal/wb_proto_fv.sv" > "$OUT"
       dfm-out fileset --filetype verilogSource --basedir "$TASK_RUNDIR" wb_proto_fv.v
 
@@ -55,6 +60,16 @@ fragment:
   # so the proof always re-runs -- no per-instance setting needed here.
   - root: fv
     uses: formal.sby.BMC
+    needs: [sv2v]
+    with:
+      top: wb_proto_fv
+      depth: 24
+
+  # Cover (reachability / non-vacuity): proves every cover() statement in the
+  # protocol checker + harness (phase start, ACK/ERR termination, end-to-end
+  # request/response traversal) is reachable -- so the BMC pass above is not vacuous.
+  - root: fv-cover
+    uses: formal.sby.Cover
     needs: [sv2v]
     with:
       top: wb_proto_fv

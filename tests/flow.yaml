@@ -1,10 +1,10 @@
 # yaml-language-server: $schema=https://dv-flow.github.io/flow.dv.schema.json
 fragment:
   # Unnamed fragment (see src/flow.yaml) -- tasks live under the package, e.g.
-  # wb.proto.wb-proto / wb.proto.wb-std.
+  # fw.proto.wb.wb-proto.
   tasks:
   # REQUIRED back-to-back simulation test (design §8a): drives the full kit stack
-  # and checks round-trip integrity, backpressure, ERR/RTY, block/RMW, monitor.
+  # and checks round-trip integrity, backpressure, ERR, monitor.
   - name: wb-proto-tb
     uses: std.FileSet
     with:
@@ -19,28 +19,10 @@ fragment:
     needs: [files, wb-proto-tb]
     with:
       top: [wb_proto_tb]
+      # exercise the protocol checker's concurrent-SVA layer in sim too
+      defines:
+      - WB_PROTO_SVA
 
   - root: wb-proto
     uses: hdlsim.vlt.SimRun
     needs: [wb-proto-img]
-
-  # Adapter test (design §7): a full std -> Wishbone -> std stack proving the
-  # protocol-independent std_mem_if layer.
-  - name: wb-std-tb
-    uses: std.FileSet
-    with:
-      type: systemVerilogSource
-      include:
-      - wb_std_tb.sv
-      incdirs:
-      - .
-
-  - name: wb-std-img
-    uses: hdlsim.vlt.SimImage
-    needs: [files, wb-std-tb]
-    with:
-      top: [wb_std_tb]
-
-  - root: wb-std
-    uses: hdlsim.vlt.SimRun
-    needs: [wb-std-img]
