@@ -56,10 +56,16 @@ jobs:
       - name: Run formal test
         run: direnv exec . dfm run fw.proto.wb.fv
 
+      # Cover (non-vacuity): proves every cover() in the checker + harness is
+      # reachable, so the BMC pass above isn't vacuously true.
+      - name: Run formal non-vacuity check
+        run: direnv exec . dfm run fw.proto.wb.fv-cover
+
       # On a sby failure the proof's logs live in the task rundir (not the dfm
       # console output); surface them so failures are diagnosable from CI.
       - name: Dump formal logs on failure
         if: failure()
         run: |
-          find rundir/fw.proto.wb.fv -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
+          find rundir/fw.proto.wb.fv rundir/fw.proto.wb.fv-cover \
+            -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
             | while read -r f; do echo "::group::$f"; cat "$f"; echo "::endgroup::"; done
