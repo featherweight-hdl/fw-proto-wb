@@ -50,6 +50,7 @@ data-types
 api-reference
 adapters
 verification
+protocol-property-checking
 ```
 
 ```{toctree}

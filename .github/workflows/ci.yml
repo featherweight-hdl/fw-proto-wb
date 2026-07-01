@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v7
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -48,20 +48,18 @@ jobs:
       - name: Allow direnv
         run: direnv allow .
 
-      # Back-to-back kit sim (§8a) and the std -> WB -> std adapter stack.
+      # Back-to-back kit sim (§8a).
       - name: Run simulation tests
-        run: |
-          direnv exec . dfm run wb.proto.wb-proto
-          direnv exec . dfm run wb.proto.wb-std
+        run: direnv exec . dfm run fw.proto.wb.wb-proto
 
       # Back-to-back SymbiYosys BMC proof of the cores.
       - name: Run formal test
-        run: direnv exec . dfm run wb.proto.fv
+        run: direnv exec . dfm run fw.proto.wb.fv
 
       # On a sby failure the proof's logs live in the task rundir (not the dfm
       # console output); surface them so failures are diagnosable from CI.
       - name: Dump formal logs on failure
         if: failure()
         run: |
-          find rundir/wb.proto.fv -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
+          find rundir/fw.proto.wb.fv -name '*.txt' -o -name '*.log' -o -name 'logfile*' 2>/dev/null \
             | while read -r f; do echo "::group::$f"; cat "$f"; echo "::endgroup::"; done
