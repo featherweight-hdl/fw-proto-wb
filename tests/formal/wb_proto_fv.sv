@@ -136,6 +136,15 @@ module wb_proto_fv #(
         assume (rsp_stall <= MODEL_MAX);
     end
 
+    // RESPONSE CONSUMER ALWAYS READY -- model the transactor's actual environment.
+    // The lean initiator drives its response combinationally (rsp_valid = term in
+    // the BUS phase) and does NOT latch/hold it: the master's rsp-link is only
+    // ever consumed by its own thin xtor_if, whose rsp_ready is pre-armed before
+    // the response arrives (never back-pressures). Assuming snk_rsp_ready models
+    // that always-ready consumer, so the master is never required to hold a
+    // response beat across a stall (which the combinational producer cannot do).
+    always @(*) assume (snk_rsp_ready);
+
     // LINK CONTRACTS -- a ready/valid producer holds valid+data stable while its
     // consumer stalls (master rsp-link, slave req-link). Internal links, so not
     // visible to the bus-level protocol checker.
@@ -188,18 +197,23 @@ module wb_proto_fv #(
                 assert (f_req_have);
                 assert (t_req_data == f_req);
             end
-    // the f_idx-th response leaving the master equals the f_idx-th model response
+    // the f_idx-th response leaving the master equals the f_idx-th model response.
+    // The lean cores make the response path combinational (model -> slave ACK ->
+    // master response within ONE cycle), so the tracked beat can ENTER the slave
+    // the very same cycle it LEAVES the master. In that case f_rsp/f_rsp_have are
+    // not yet latched, so compare against the live mdl_rsp instead.
+    wire rsp_track_here = f_rsp_have || (in_rsp && (inr_cnt == f_idx));
     always @(posedge clock)
         if (!reset)
             if (out_rsp && (outr_cnt == f_idx)) begin
-                assert (f_rsp_have);
-                assert (i_rsp_data == f_rsp);
+                assert (rsp_track_here);
+                assert (i_rsp_data == (f_rsp_have ? f_rsp : mdl_rsp));
             end
 
     // non-vacuity: a tracked request and response actually traverse end to end
     always @(posedge clock) begin
         cover (!reset && out_req && (outq_cnt == f_idx) && f_req_have);
-        cover (!reset && out_rsp && (outr_cnt == f_idx) && f_rsp_have);
+        cover (!reset && out_rsp && (outr_cnt == f_idx) && rsp_track_here);
     end
 `endif
 endmodule

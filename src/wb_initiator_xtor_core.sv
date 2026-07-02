@@ -3,10 +3,10 @@
 // ----------------------------------------------------------------------------
 // Wishbone Initiator core transactor (pure module, signal-level ports)
 //
-// Bridges a ready/valid request/response stream (FIFO side) to the classic
+// Bridges a ready/valid request/response stream (interface side) to the classic
 // Wishbone initiator protocol (protocol side). Single outstanding request.
-//   - req_* : RV target port  (FIFO -> core)   { adr, dat, we, stb(byte-en) }
-//   - rsp_* : RV initiator port (core -> FIFO)  { dat, err }
+//   - req_* : RV target port    (interface -> core) { adr, dat, we, sel(byte-en) }
+//   - rsp_* : RV initiator port  (core -> interface) { dat, err }
 //
 // Migrated from fwvip-wb (authoritative transactor API). Classic single-
 // outstanding WB: terminates on ACK or ERR (no RTY, no CYC-hold).
@@ -51,108 +51,65 @@ module wb_initiator_xtor_core #(
         req_u = req_s'(req_dat);
     end
 
-    // Internal registers driving Wishbone outputs
-    reg [ADDR_WIDTH-1:0]     adr_r;
-    reg [DATA_WIDTH-1:0]     dat_w_r;
-    reg [DATA_WIDTH/8-1:0]   sel_r;       // Byte enables (from req_u.stb)
-    reg                      stb_r;       // Strobe
-    reg                      cyc_r;       // Cycle indicator
-    reg                      we_r;        // Write enable
-
+    // Registered Wishbone request outputs -- latched when a request is accepted
+    // (state 0 -> 1). Holding them in flops (rather than combinationally tracking
+    // req_dat) keeps adr/dat_w/sel/we glitch-free and stable for the entire bus
+    // phase, independent of when the HVL next updates req_dat. Matches the
+    // canonical lean BFM pattern.
+    reg [ADDR_WIDTH-1:0]    adr_r;
+    reg [DATA_WIDTH-1:0]    dat_w_r;
+    reg [DATA_WIDTH/8-1:0]  sel_r;
+    reg                     we_r;
     assign adr   = adr_r;
     assign dat_w = dat_w_r;
     assign sel   = sel_r;
-    assign stb   = stb_r;
-    assign cyc   = cyc_r;
     assign we    = we_r;
-
-    // Response registers
-    reg [DATA_WIDTH-1:0]     dat_r_q;
-    reg                      err_q;
-    reg                      rsp_valid_r;
 
     // Pack response { dat, err }
     rsp_s rsp_u;
     always_comb begin
-        rsp_u.dat = dat_r_q;
-        rsp_u.err = err_q;
+        rsp_u.dat = dat_r;
+        rsp_u.err = err;
     end
-    assign rsp_dat   = rsp_u;
-    assign rsp_valid = rsp_valid_r;
+    assign rsp_dat = rsp_u;
 
-    // Accept a new request only while idle
-    wire req_fire = req_valid && req_ready;
-    wire rsp_fire = rsp_valid && rsp_ready;
-
-    // Termination when ACK or ERR asserted
     wire term = ack || err;
 
-    // State machine
-    typedef enum logic [1:0] {
-        IDLE = 2'b00,
-        BUS  = 2'b01,
-        RESP = 2'b10
-    } state_e;
+    bit state;
 
-    state_e state;
+    // STB/CYC are asserted only in the BUS phase (state 1). Deliberately NOT
+    // extended into state 0 on req_valid: the FSM always passes through a state-0
+    // (STB-low) cycle between phases, which (a) frames each Wishbone phase for the
+    // protocol checker and (b) gives the target the !active_cycle it needs to re-arm
+    // (avoids re-capturing the same phase). Matches the canonical lean BFM pattern.
+    assign stb   = (state == 1);
+    assign cyc   = (state == 1);
 
-    assign req_ready = (state == IDLE);
+    assign req_ready = (state == 0);
+    assign rsp_valid = (term && state == 1);
 
     always @(posedge clock or posedge reset) begin
         if (reset) begin
-            state        <= IDLE;
+            state        <= 1'b0;
             adr_r        <= '0;
             dat_w_r      <= '0;
             sel_r        <= '0;
-            stb_r        <= 1'b0;
-            cyc_r        <= 1'b0;
             we_r         <= 1'b0;
-            dat_r_q      <= '0;
-            err_q        <= 1'b0;
-            rsp_valid_r  <= 1'b0;
         end else begin
-            case (state)
-                IDLE: begin
-                    // Accept a new request
-                    if (req_fire) begin
-                        adr_r       <= req_u.adr;
-                        dat_w_r     <= req_u.dat;
-                        sel_r       <= req_u.stb;
-                        we_r        <= req_u.we;
-                        stb_r       <= 1'b1;
-                        cyc_r       <= 1'b1;
-                        state       <= BUS;
-`ifdef DEBUG
-                        $display("[INIT][%0t] IDLE->BUS adr=0x%08x dat=0x%08x we=%0b sel=%0h", $time, req_u.adr, req_u.dat, req_u.we, req_u.stb);
-`endif
-                    end
+            if (state == 0) begin
+                if (req_valid) begin
+                    // Accept the request: latch its fields, launch the bus phase
+                    adr_r   <= req_u.adr;
+                    dat_w_r <= req_u.dat;
+                    sel_r   <= req_u.sel;
+                    we_r    <= req_u.we;
+                    state   <= 1'b1;
                 end
-                BUS: begin
-                    // Wait for ACK or ERR termination (CYC/STB held until term)
-                    if (term) begin
-                        dat_r_q     <= dat_r;
-                        err_q       <= err;
-                        stb_r       <= 1'b0;
-                        cyc_r       <= 1'b0;
-                        rsp_valid_r <= 1'b1;
-                        state       <= RESP;
-`ifdef DEBUG
-                        $display("[INIT][%0t] BUS->RESP term ack=%0b err=%0b dat_r=0x%08x", $time, ack, err, dat_r);
-`endif
-                    end
+            end else begin
+                if (term) begin
+                    state <= 1'b0;
                 end
-                RESP: begin
-                    // Hold response until consumed
-                    if (rsp_fire) begin
-                        rsp_valid_r <= 1'b0;
-                        state       <= IDLE;
-`ifdef DEBUG
-                        $display("[INIT][%0t] RESP->IDLE rsp consumed", $time);
-`endif
-                    end
-                end
-                default: state <= IDLE;
-            endcase
+            end
         end
     end
 

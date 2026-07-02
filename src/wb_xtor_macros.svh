@@ -17,7 +17,7 @@
         bit[ADDR_WIDTH-1:0]     adr; \
         bit[DATA_WIDTH-1:0]     dat; \
         bit                     we;  \
-        bit[(DATA_WIDTH/8)-1:0] stb; \
+        bit[(DATA_WIDTH/8)-1:0] sel; \
     }
 
 `define WB_INITIATOR_RSP_S(ADDR_WIDTH, DATA_WIDTH) \
